@@ -72,9 +72,11 @@ app.post('/incoming-call', async (req, res) => {
     // Falls back to no callerId attribute if we couldn't extract a number.
     const callerIdAttr = callerNumber ? ` callerId="${callerNumber}"` : '';
 
+    // Note: callerId removed temporarily — VoIP.MS returns 603 Decline when
+    // the customer's mobile number is used as FROM (not an authorized DID).
     return res.type('text/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial${callerIdAttr}>
+  <Dial>
     <Sip username="${voipmsUser}" password="${voipmsPass}">sip:${sipUser}@${sipServer}</Sip>
   </Dial>
 </Response>`);
