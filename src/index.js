@@ -92,6 +92,7 @@ app.post('/incoming-call', async (req, res) => {
       agent_id: process.env.RETELL_AGENT_ID,
       direction: 'inbound',
       ...(fromNumber && { from_number: fromNumber }),
+      ...(process.env.RETELL_PHONE_NUMBER && { to_number: process.env.RETELL_PHONE_NUMBER }),
     });
 
     console.log(`Retell call registered: ${call_id}`);
