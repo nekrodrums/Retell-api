@@ -84,9 +84,14 @@ app.post('/incoming-call', async (req, res) => {
 
   // --- NORMAL FLOW → Retell (Anna) ---
   try {
+    const fromRaw = req.body.From || req.body.Caller || '';
+    const fromNumber = fromRaw.match(/\+?\d{7,15}/)?.[0] || '';
+    console.log(`Registering Retell call — From: ${fromNumber || '(unknown)'}`);
+
     const { call_id } = await retell.call.registerPhoneCall({
       agent_id: process.env.RETELL_AGENT_ID,
       direction: 'inbound',
+      ...(fromNumber && { from_number: fromNumber }),
     });
 
     console.log(`Retell call registered: ${call_id}`);
