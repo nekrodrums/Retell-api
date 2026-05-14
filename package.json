@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "express": "^4.19.2",
+    "node-cron": "^4.2.1",
+    "resend": "^6.12.3",
     "retell-sdk": "^4.0.0"
   }
 }

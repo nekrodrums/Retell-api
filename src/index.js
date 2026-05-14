@@ -1,5 +1,7 @@
 import express from 'express';
 import Retell from 'retell-sdk';
+import cron from 'node-cron';
+import { sendDailyReport } from './dailyReport.js';
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
@@ -112,6 +114,13 @@ app.post('/incoming-call', async (req, res) => {
   }
 });
 
+// Manual trigger — test the daily report immediately
+app.get('/send-report-now', async (_req, res) => {
+  console.log('[Manual] Daily report triggered via HTTP');
+  sendDailyReport(); // fire and forget
+  res.json({ status: 'Report generation started — check logs and email.' });
+});
+
 // Health check — also shows loaded agents (useful for debugging)
 app.get('/health', (_req, res) => {
   res.json({
@@ -123,3 +132,11 @@ app.get('/health', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Daily report at 9pm MDT = 03:00 UTC
+cron.schedule('0 3 * * *', () => {
+  console.log('[Cron] Triggering daily report...');
+  sendDailyReport();
+}, { timezone: 'UTC' });
+
+console.log('Daily report scheduled: 9:00 PM MDT (03:00 UTC)');
