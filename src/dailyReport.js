@@ -25,7 +25,7 @@ async function fetchTodaysCalls() {
         before_start_timestamp: endUTC.getTime(),
       },
       limit: 100,
-      sort_order: 'ascending',
+      sort_order: 'descending',
     }),
   });
 
@@ -47,68 +47,91 @@ function buildHtml(calls, dateStr) {
   const xfer    = calls.filter(c => c.disconnection_reason === 'call_transfer').length;
   const totalMin = Math.round(calls.reduce((s, c) => s + (c.duration_ms || 0), 0) / 60000);
 
-  const maxDur  = calls.filter(c => c.disconnection_reason === 'max_duration_reached');
-  const negSent = calls.filter(c => c.call_analysis?.user_sentiment === 'Negative');
+  const maxDur   = calls.filter(c => c.disconnection_reason === 'max_duration_reached');
+  const negSent  = calls.filter(c => c.call_analysis?.user_sentiment === 'Negative');
+  const totalCost = calls.reduce((s, c) => s + (c.call_cost?.combined_cost || 0), 0);
 
   const row = (label, value) =>
     `<tr><td style="padding:6px 12px;border:1px solid #ddd"><b>${label}</b></td><td style="padding:6px 12px;border:1px solid #ddd">${value}</td></tr>`;
 
   let html = `
 <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">
-  <h2 style="color:#1a1a1a">📞 ERA AI — Reporte Diario ${dateStr}</h2>
+  <h2 style="color:#1a1a1a">ERA AI — Daily Report ${dateStr}</h2>
 
   <table style="border-collapse:collapse;width:100%;margin-bottom:24px">
-    ${row('Total llamadas', `${total} &nbsp;(${phone} tel / ${web} web)`)}
-    ${row('Exitosas', `✅ ${ok}`)}
-    ${row('Fallidas', `❌ ${fail}`)}
-    ${row('Transferidas exitosamente', `🔁 ${xfer}`)}
-    ${row('Duración total', `~${totalMin} min`)}
+    ${row('Total calls', `${total} &nbsp;(${phone} phone / ${web} web)`)}
+    ${row('Successful', `✅ ${ok}`)}
+    ${row('Failed', `❌ ${fail}`)}
+    ${row('Transferred', `🔁 ${xfer}`)}
+    ${row('Total duration', `~${totalMin} min`)}
+    ${row('Total cost', `$${totalCost.toFixed(4)} USD`)}
   </table>
 `;
 
   if (maxDur.length > 0) {
-    html += `<h3 style="color:#c0392b">⚠️ Cortadas por tiempo máximo (posibles leads perdidos)</h3><ul>`;
+    html += `<h3 style="color:#c0392b">Max Duration Reached — Potential Lost Leads</h3><ul>`;
     for (const c of maxDur) {
-      const s = c.call_analysis?.call_summary || '(sin resumen)';
+      const s = c.call_analysis?.call_summary || '(no summary)';
       html += `<li style="margin-bottom:6px">${s.substring(0, 250)}</li>`;
     }
     html += `</ul>`;
   }
 
   if (negSent.length > 0) {
-    html += `<h3 style="color:#e67e22">😟 Sentiment negativo</h3><ul>`;
+    html += `<h3 style="color:#e67e22">Negative Sentiment</h3><ul>`;
     for (const c of negSent) {
-      const s = c.call_analysis?.call_summary || '(sin resumen)';
+      const s = c.call_analysis?.call_summary || '(no summary)';
       html += `<li style="margin-bottom:6px">${s.substring(0, 250)}</li>`;
     }
     html += `</ul>`;
   }
 
-  html += `<h3>📋 Todas las llamadas</h3>
-  <table style="border-collapse:collapse;width:100%;font-size:13px">
-    <tr style="background:#f5f5f5">
-      <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">Hora MDT</th>
-      <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">Dur.</th>
-      <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">OK</th>
-      <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">Resumen</th>
-    </tr>`;
+  html += `
+<h3>All Calls <span style="font-size:13px;font-weight:normal;color:#666">(most recent first)</span></h3>
+<script>
+function copyId(id) {
+  navigator.clipboard.writeText(id).then(function() {
+    var el = document.getElementById('copied-' + id.slice(-6));
+    if (el) { el.textContent = '✔'; setTimeout(function(){ el.textContent = '📋'; }, 1500); }
+  });
+}
+</script>
+<table style="border-collapse:collapse;width:100%;font-size:13px">
+  <tr style="background:#f5f5f5">
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">Time MDT</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">Dur.</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">OK</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:right">Cost</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">Call ID</th>
+    <th style="padding:6px 8px;border:1px solid #ddd;text-align:left">Summary</th>
+  </tr>`;
 
   for (const c of calls) {
     const t    = toMDT(c.start_timestamp);
     const dur  = Math.round((c.duration_ms || 0) / 1000) + 's';
     const flag = c.call_analysis?.call_successful === true ? '✅' : '❌';
+    const cost = c.call_cost?.combined_cost != null
+      ? '$' + c.call_cost.combined_cost.toFixed(4)
+      : '—';
     const sum  = (c.call_analysis?.call_summary || '').substring(0, 140);
     const bg   = c.disconnection_reason === 'max_duration_reached' ? '#fff3cd' : '';
+    const shortId = c.call_id.slice(-6);
     html += `<tr style="background:${bg}">
-      <td style="padding:5px 8px;border:1px solid #ddd">${t}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap">${t}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap">${dur}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd">${flag}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${flag}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;text-align:right;white-space:nowrap;font-family:monospace">${cost}</td>
+      <td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;font-family:monospace;font-size:11px">
+        …${shortId}
+        <button id="copied-${shortId}" onclick="copyId('${c.call_id}')" title="${c.call_id}"
+          style="background:none;border:none;cursor:pointer;font-size:13px;padding:0 2px;vertical-align:middle">📋</button>
+      </td>
       <td style="padding:5px 8px;border:1px solid #ddd">${sum}</td>
     </tr>`;
   }
 
   html += `</table>
-  <p style="color:#888;font-size:12px;margin-top:24px">Generado automáticamente por ERA Railway Server · ${dateStr} 9pm MDT</p>
+  <p style="color:#888;font-size:12px;margin-top:24px">Auto-generated by ERA Railway Server · ${dateStr} 9pm MDT</p>
 </div>`;
 
   return html;
@@ -121,12 +144,12 @@ export async function sendDailyReport() {
 
     console.log(`[DailyReport] Fetching calls for ${dateStr}...`);
     const calls = await fetchTodaysCalls();
-    console.log(`[DailyReport] ${calls.length} calls found — sending email...`);
+    console.log(`[DailyReport] ${calls.length} call(s) found — sending email...`);
 
     const { data, error } = await resend.emails.send({
       from: 'ERA AI Report <onboarding@resend.dev>',
       to: ['anna.ai@era.ca'],
-      subject: `📞 ERA AI — Reporte ${dateStr} (${calls.length} llamadas)`,
+      subject: `ERA AI — Daily Report ${dateStr} (${calls.length} calls)`,
       html: buildHtml(calls, dateStr),
     });
 
