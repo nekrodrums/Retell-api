@@ -49,7 +49,8 @@ function buildHtml(calls, dateStr) {
 
   const maxDur   = calls.filter(c => c.disconnection_reason === 'max_duration_reached');
   const negSent  = calls.filter(c => c.call_analysis?.user_sentiment === 'Negative');
-  const totalCost = calls.reduce((s, c) => s + (c.call_cost?.combined_cost || 0), 0);
+  // combined_cost is in cents — divide by 100 to get USD
+  const totalCost = calls.reduce((s, c) => s + (c.call_cost?.combined_cost || 0), 0) / 100;
 
   const row = (label, value) =>
     `<tr><td style="padding:6px 12px;border:1px solid #ddd"><b>${label}</b></td><td style="padding:6px 12px;border:1px solid #ddd">${value}</td></tr>`;
@@ -110,8 +111,9 @@ function copyId(id) {
     const t    = toMDT(c.start_timestamp);
     const dur  = Math.round((c.duration_ms || 0) / 1000) + 's';
     const flag = c.call_analysis?.call_successful === true ? '✅' : '❌';
+    // combined_cost is in cents — divide by 100 to get USD
     const cost = c.call_cost?.combined_cost != null
-      ? '$' + c.call_cost.combined_cost.toFixed(4)
+      ? '$' + (c.call_cost.combined_cost / 100).toFixed(4)
       : '—';
     const sum  = (c.call_analysis?.call_summary || '').substring(0, 140);
     const bg   = c.disconnection_reason === 'max_duration_reached' ? '#fff3cd' : '';
